@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reserva Técnica — Análise das Demandas de Custeio</title>
+<style>
+:root{
+  --blue:#185FA5; --blue-light:#378ADD; --blue-bg:#EBF3FB;
+  --green:#1E7E45; --green-bg:#E7F5EC; --green-border:#BCE3CB;
+  --red:#C0392B; --red-bg:#FBEAE8; --red-border:#F0C4BE;
+  --amber:#B7791F; --amber-bg:#FFFBEA; --amber-border:#F2E2A8;
+  --gray:#6B7280; --text:#1F2937; --border:#E2E8F0; --bg:#F5F7FA;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  background:var(--bg); color:var(--text); font-size:14px; line-height:1.5;}
+.panel{max-width:1280px; margin:0 auto; padding:28px 24px 60px;}
+.panel-title{font-size:12px; letter-spacing:2.5px; text-transform:uppercase; color:var(--blue); font-weight:600;}
+.panel-heading{font-size:26px; font-weight:700; color:var(--text); margin-top:4px;}
+.panel-subtitle{font-size:14px; color:var(--gray); margin-top:6px; max-width:960px;}
+.divider{height:3px; width:64px; background:var(--blue); margin:16px 0 20px; border-radius:2px;}
+
+/* ===== Barra fixa (topo congelado) ===== */
+body{overflow-x:hidden;}
+.sticky-bar{background:#fff; border-bottom:1px solid var(--border);
+  margin:0 calc(50% - 50vw) 18px; padding:14px calc(50vw - 50%) 12px;}
+@media (min-width:761px){
+  .sticky-bar{position:sticky; top:0; z-index:50; box-shadow:0 3px 10px rgba(24,95,165,.08);}
+}
+.sb-row{display:flex; flex-wrap:wrap; gap:24px; align-items:flex-start;}
+.sb-item{min-width:150px;}
+.sb-item .label{font-size:10.5px; text-transform:uppercase; letter-spacing:1px; color:var(--gray); font-weight:600;}
+.sb-item .value{font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:2px;}
+.sb-item .value.green{color:var(--green);}
+.sb-item .value.amber{color:var(--amber);}
+.sb-item .value.red{color:var(--red);}
+.sb-item input.rt-input{width:160px; font-size:19px; font-weight:700; color:var(--blue);
+  border:none; border-bottom:2px dashed var(--border); padding:2px 2px; outline:none;
+  background:#FAFBFD; border-radius:4px 4px 0 0; font-family:inherit; font-variant-numeric:tabular-nums; margin-top:2px;}
+.sb-item input.rt-input:focus{border-bottom-color:var(--blue);}
+.sb-progress{flex:1; min-width:220px; padding-top:4px;}
+.progress-track{height:9px; background:#EDF1F6; border-radius:5px; overflow:hidden;}
+.progress-fill{height:100%; border-radius:5px; background:var(--green); transition:width .3s, background .3s; width:0%;}
+.sb-progress-meta{display:flex; justify-content:space-between; font-size:11.5px; color:var(--gray); margin-top:5px;}
+.sb-actions{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; align-items:center;}
+.btn{border:1px solid var(--border); background:#fff; color:var(--text); padding:7px 14px;
+  border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; transition:all .15s; font-family:inherit;}
+.btn:hover{border-color:var(--blue); color:var(--blue);}
+.btn.primary{background:var(--blue); border-color:var(--blue); color:#fff;}
+.btn.primary:hover{background:#134e88; color:#fff;}
+.btn.danger-ghost:hover{border-color:var(--red); color:var(--red);}
+.sb-actions .spacer{flex:1;}
+.save-state{font-size:11.5px; color:var(--gray);}
+
+/* ===== Cards de resumo (coloridos) ===== */
+.summary-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(195px,1fr)); gap:12px; margin-bottom:14px;}
+.ccard{border-radius:10px; padding:13px 16px 11px; color:#fff; display:flex; flex-direction:column; gap:7px; min-height:104px;}
+.cc-blue{background:var(--blue);}
+.cc-slate{background:#5B6B7E;}
+.cc-green{background:var(--green);}
+.cc-amber{background:var(--amber);}
+.cc-red{background:var(--red);}
+.cc-label{font-size:11px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; color:rgba(255,255,255,.92);}
+.cc-value{font-size:22px; font-weight:700; text-align:right; font-variant-numeric:tabular-nums; line-height:1.15;}
+.cc-foot{display:flex; justify-content:space-between; gap:8px; font-size:12px; color:rgba(255,255,255,.88);
+  border-top:1px solid rgba(255,255,255,.28); padding-top:6px; margin-top:auto;}
+.cc-foot span:last-child{font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap;}
+.map-obs{background:var(--amber-bg); border:1px solid var(--amber-border); border-radius:8px;
+  padding:11px 14px; font-size:12.5px; color:#7A5A14; margin-bottom:22px;}
+
+/* ===== Abas ===== */
+.tabs{display:flex; gap:4px; flex-wrap:wrap; border-bottom:2px solid var(--blue); margin-bottom:0;}
+.tab-btn{border:none; background:transparent; color:var(--text);
+  padding:10px 22px; font-size:13px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+  cursor:pointer; font-family:inherit; transition:color .15s, background .15s;}
+.tab-btn:hover{color:var(--blue);}
+.tab-btn.active{background:var(--blue); color:#fff;}
+.tab-body{background:#fff; padding:18px 20px 24px; margin-bottom:22px;}
+.tab-body h2{font-size:15px; font-weight:700; margin-bottom:2px;}
+.tab-body .desc{font-size:12.5px; color:var(--gray); margin-bottom:14px;}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+
+table{width:100%; border-collapse:collapse; font-size:13px;}
+th{font-size:10.5px; text-transform:uppercase; letter-spacing:.6px; color:var(--gray); font-weight:600;
+  text-align:left; padding:8px 9px; border-bottom:2px solid var(--border); white-space:nowrap;}
+td{padding:9px 9px; border-bottom:1px solid #EFF2F6; vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+.num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;}
+th.num{text-align:right;}
+.unit-table tbody tr:hover{background:#FAFBFD;}
+.muted{color:var(--gray);}
+td.orc-updated{background:var(--green-bg);}
+.orc-delta{display:block; font-size:11px; color:var(--green); font-weight:600;}
+.pct-chip{display:inline-block; padding:1px 8px; border-radius:10px; font-size:11.5px; font-weight:600;}
+.pct-low{background:var(--green-bg); color:var(--green);}
+.pct-mid{background:var(--amber-bg); color:var(--amber);}
+.pct-high{background:var(--red-bg); color:var(--red);}
+
+.filters{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;}
+.filters select, .filters input[type=search]{border:1px solid var(--border); border-radius:8px; padding:7px 10px;
+  font-size:13px; background:#fff; color:var(--text); font-family:inherit; outline:none;}
+.filters select:focus, .filters input:focus{border-color:var(--blue);}
+.filters input[type=search]{flex:1; min-width:180px;}
+.count-line{font-size:12.5px; color:var(--gray); margin-bottom:10px;}
+
+.badge{display:inline-block; padding:2px 9px; border-radius:10px; font-size:11px; font-weight:600; white-space:nowrap;}
+.b-p1{background:var(--red-bg); color:var(--red); border:1px solid var(--red-border);}
+.b-p2{background:var(--amber-bg); color:var(--amber); border:1px solid var(--amber-border);}
+.b-p3{background:var(--blue-bg); color:var(--blue); border:1px solid #C7DEF3;}
+.b-pn{background:#F1F3F6; color:var(--gray); border:1px solid var(--border);}
+.b-def{background:var(--green-bg); color:var(--green); border:1px solid var(--green-border);}
+.b-par{background:var(--amber-bg); color:var(--amber); border:1px solid var(--amber-border);}
+.b-ind{background:var(--red-bg); color:var(--red); border:1px solid var(--red-border);}
+.b-pen{background:#F1F3F6; color:var(--gray); border:1px solid var(--border);}
+
+.dem-row{cursor:pointer;}
+.dem-row:hover{background:#FAFBFD;}
+.dem-row.is-def{background:#F4FBF6;}
+.dem-row.is-ind{background:#FDF6F5;}
+.dem-row.is-ind .dem-name{color:var(--gray); text-decoration:line-through;}
+.dem-name{font-weight:500;}
+.dem-unit{font-size:11.5px; color:var(--gray); margin-top:1px;}
+.detail-row td{background:#F8FAFC; border-bottom:1px solid var(--border); padding:14px 16px;}
+.detail-grid{display:grid; gap:10px;}
+.detail-grid .dt-label{font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--gray); font-weight:600;}
+.detail-grid .dt-text{font-size:13px; margin-top:2px;}
+.decision-bar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:4px;}
+.decision-bar .btn{padding:6px 12px; font-size:12.5px;}
+.btn.b-green{border-color:var(--green); color:var(--green);}
+.btn.b-green:hover, .btn.b-green.active{background:var(--green); color:#fff;}
+.btn.b-red{border-color:var(--red-border); color:var(--red);}
+.btn.b-red:hover, .btn.b-red.active{background:var(--red); color:#fff; border-color:var(--red);}
+.val-input{width:140px; border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:13px;
+  text-align:right; font-variant-numeric:tabular-nums; font-family:inherit; outline:none;}
+.val-input:focus{border-color:var(--blue);}
+.nota-input{flex:1; min-width:200px; border:1px solid var(--border); border-radius:8px; padding:6px 10px;
+  font-size:12.5px; font-family:inherit; outline:none;}
+.nota-input:focus{border-color:var(--blue);}
+.sr-only{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0);}
+
+#print-report{display:none;}
+@media print{
+  body{background:#fff;}
+  .panel{display:none;}
+  #print-report{display:block; padding:0; font-size:12px; color:#111;}
+  #print-report .pr-title{font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--blue); font-weight:600;}
+  #print-report h1{font-size:19px; margin:2px 0 2px;}
+  #print-report .pr-sub{font-size:11px; color:#555; margin-bottom:14px; max-width:100%;}
+  #print-report table{font-size:11px;}
+  #print-report th{padding:5px 7px;}
+  #print-report td{padding:5px 7px;}
+  #print-report tr{page-break-inside:avoid;}
+  #print-report h2{font-size:13.5px; margin:18px 0 6px;}
+  #print-report .pr-cards{display:flex; gap:10px; margin:10px 0 6px;}
+  #print-report .pr-card{border:1px solid #CCD3DC; border-radius:6px; padding:8px 12px; flex:1;}
+  #print-report .pr-card .label{font-size:9.5px; text-transform:uppercase; letter-spacing:.8px; color:#666;}
+  #print-report .pr-card .value{font-size:14.5px; font-weight:700;}
+  #print-report .neg{color:var(--red);}
+  #print-report .pos{color:var(--green);}
+  #print-report .pr-foot{margin-top:16px; font-size:10px; color:#777; border-top:1px solid #DDD; padding-top:6px;}
+}
+@media (max-width:760px){
+  .panel{padding:18px 12px 40px;}
+  .panel-heading{font-size:20px;}
+  .hide-sm{display:none;}
+  .sb-row{gap:14px;}
+}
+</style>
+</head>
+<body>
+<div class="panel">
+  <p class="panel-heading">Reserva Técnica — Análise das Demandas de Custeio</p>
+  <div class="divider"></div>
+
+  <div class="sticky-bar">
+    <div class="sb-row">
+      <div class="sb-item">
+        <div class="label">Reserva Técnica (editável)</div>
+        <input class="rt-input" id="rt-input" inputmode="decimal" aria-label="Valor da Reserva Técnica">
+      </div>
+      <div class="sb-item">
+        <div class="label">Total deferido</div>
+        <div class="value" id="sb-def">R$ 0,00</div>
+      </div>
+      <div class="sb-item">
+        <div class="label">Saldo da Reserva</div>
+        <div class="value green" id="sb-saldo"></div>
+      </div>
+      <div class="sb-progress">
+        <div class="progress-track"><div class="progress-fill" id="rt-fill"></div></div>
+        <div class="sb-progress-meta"><span id="sb-pct"></span><span id="sb-ndef"></span></div>
+      </div>
+    </div>
+    <div class="sb-actions">
+      <button class="btn primary" onclick="exportPDF()">Gerar relatório (PDF)</button>
+      <button class="btn" onclick="exportJSON()">Exportar decisões</button>
+      <button class="btn" onclick="document.getElementById('import-file').click()">Importar decisões</button>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importJSON(this)">
+      <button class="btn danger-ghost" onclick="clearDecisions()">Limpar</button>
+      <span class="spacer"></span>
+      <span class="save-state" id="save-state"></span>
+    </div>
+  </div>
+
+  <div class="summary-grid">
+    <div class="ccard cc-blue">
+      <div class="cc-label">Total demandado</div>
+      <div class="cc-value" id="c-total"></div>
+      <div class="cc-foot"><span>Demandas apresentadas</span><span id="c-total-sub"></span></div>
+    </div>
+    <div class="ccard cc-slate">
+      <div class="cc-label">Demandas analisadas</div>
+      <div class="cc-value" id="c-anal"></div>
+      <div class="cc-foot"><span>Pendentes de análise</span><span id="c-anal-sub"></span></div>
+    </div>
+    <div class="ccard cc-green">
+      <div class="cc-label">Deferido — integral</div>
+      <div class="cc-value" id="c-int"></div>
+      <div class="cc-foot"><span>Demandas</span><span id="c-int-sub"></span></div>
+    </div>
+    <div class="ccard cc-amber">
+      <div class="cc-label">Deferido — parcial</div>
+      <div class="cc-value" id="c-par"></div>
+      <div class="cc-foot"><span>Demandas (valor deferido)</span><span id="c-par-sub"></span></div>
+    </div>
+    <div class="ccard cc-red">
+      <div class="cc-label">Indeferido</div>
+      <div class="cc-value" id="c-ind"></div>
+      <div class="cc-foot"><span>Demandas (valor pedido)</span><span id="c-ind-sub"></span></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-btn-orc" onclick="setTab('orc')">Distribuição Orçamentária</button>
+    <button class="tab-btn" id="tab-btn-dem" onclick="setTab('dem')">Demandas</button>
+    <button class="tab-btn" id="tab-btn-obs" onclick="setTab('obs')">Observações</button>
+  </div>
+
+  <div class="tab-content active" id="tab-orc">
+    <div class="tab-body">
+      <div style="overflow-x:auto;">
+      <table class="unit-table">
+        <thead><tr>
+          <th>Unidade</th><th class="num">Orçamento</th><th class="num">LOA</th>
+          <th class="num">Recomp. P. 2024</th><th class="num">Demandado</th>
+          <th class="num">Demanda / Orçam.</th><th class="num">Deferido</th><th class="num">Atendimento</th>
+        </tr></thead>
+        <tbody id="unit-tbody"></tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-dem">
+    <div class="tab-body">
+      <div class="filters">
+        <select id="f-unidade" onchange="render()"></select>
+        <select id="f-prio" onchange="render()">
+          <option value="">Todas as prioridades</option>
+          <option value="1">Nível 1 · alta (Prior. 1 / Alta 01 / Grau Máximo)</option>
+          <option value="2">Nível 2 (Prior. 2 / Alta 02 / Grau Mediano)</option>
+          <option value="3">Nível 3 (Prior. 3 / Média / Grau Mínimo)</option>
+          <option value="4">Níveis 4 a 7</option>
+          <option value="99">Não informado / Indefinida</option>
+        </select>
+        <select id="f-cat" onchange="render()"></select>
+        <select id="f-status" onchange="render()">
+          <option value="">Todos os status</option>
+          <option value="pendente">Pendentes</option>
+          <option value="deferido">Deferidos (integral)</option>
+          <option value="parcial">Deferidos (parcial)</option>
+          <option value="indeferido">Indeferidos</option>
+        </select>
+        <select id="f-sort" onchange="render()">
+          <option value="alpha">Ordenar: campus / demanda (A–Z)</option>
+          <option value="prio">Ordenar: prioridade</option>
+          <option value="valor">Ordenar: maior valor</option>
+        </select>
+        <input type="search" id="f-busca" placeholder="Buscar demanda, justificativa ou documento…" oninput="render()">
+      </div>
+      <div class="count-line" id="count-line"></div>
+      <div style="overflow-x:auto;">
+      <table>
+        <thead><tr>
+          <th>Demanda</th><th class="num">Valor pedido</th>
+          <th class="num hide-sm">% Orçam. unid.</th><th style="width:130px">Status</th>
+          <th class="num">Valor deferido</th><th style="width:120px">Prioridade</th>
+        </tr></thead>
+        <tbody id="dem-tbody"></tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-obs">
+    <div class="tab-body">
+      <p class="desc" style="margin-bottom:10px">Painel de análise das respostas ao Ofício Circular 11/2026 — PRAF/REITORIA/IFPB, referente ao envio de demandas prioritárias de custeio (20RL) — Deliberação da 46ª Reunião Extraordinária do CODIR. Permite analisar as demandas apresentadas pelas unidades, correlacioná-las com a base orçamentária (LOA) e a recomposição, registrar deferimentos integrais ou parciais e acompanhar o consumo da Reserva Técnica, com geração de relatório em PDF do que foi priorizado.</p>
+      <div class="map-obs"><strong>Notas de leitura:</strong> o valor da coluna Orçamento de cada unidade decorre da LOA acrescida das recomposições e das distribuições extras decorrentes dos valores dos índices de qualidade, e é atualizado automaticamente com os valores deferidos na aba Demandas. Na aba Demandas, clique em uma linha para ver a justificativa, o documento de origem e registrar a decisão — o deferimento pode ser integral ou parcial, com valor editável. As prioridades foram informadas pelas próprias unidades em escalas distintas (Prioridade 1–7, Alta 01/02/Média, Grau Máximo/Mediano/Mínimo) e foram normalizadas apenas para fins de ordenação e filtro, preservando o rótulo original. As demandas do Campus Avançado João Pessoa Zona Sul foram associadas à base orçamentária "Avançado JP Zona Sul" do arquivo da LOA. As decisões são salvas automaticamente neste navegador e podem ser exportadas/importadas em .json.</div>
+      <div class="map-obs" style="margin-bottom:0"><strong>Demandas consolidadas:</strong> oito unidades (Cajazeiras, Patos, Sousa, Pedras de Fogo, Santa Rita, Santa Luzia, Itaporanga e Cabedelo Centro) relacionaram, na prática, o conjunto integral de suas despesas de custeio — e não pedidos incrementais. Para essas unidades, os itens relacionados foram consolidados em uma única demanda, cujo valor corresponde à necessidade efetiva: em Cajazeiras, a diferença de R$ 457.808,51 apurada no próprio documento; em Santa Rita, o valor total de solicitação de R$ 451.224,64 indicado no quadro resumo do documento; em Pedras de Fogo, a complementação total de R$ 300.000,00 solicitada expressamente no ofício; nas demais, a diferença entre o total relacionado e o orçamento da unidade constante neste painel — valores apurados e sujeitos a ajuste caso os documentos contenham quadro resumo com valor de solicitação próprio. No caso de Sousa, a diferença apurada é negativa (despesas relacionadas dentro do orçamento) e a demanda foi registrada com valor R$ 0,00 até verificação do documento original. Como o valor da diferença se dilui no conjunto das despesas, sem destinação por item, essas demandas recebem prioridade "Indefinida". A relação completa dos itens de cada ofício permanece disponível no detalhe da demanda consolidada.</div>
+    </div>
+  </div>
+</div>
+
+<div id="print-report"></div>
+
+<script>
+const DATA = {"loa": [{"key": "REITORIA", "nome": "Reitoria", "orcamento": 8852808.83, "loa": 7352808.83, "recomp": null, "recompP2024": null}, {"key": "AVANÇADO AREIA", "nome": "Campus Avançado Areia", "orcamento": 786715.46, "loa": 733819.07, "recomp": null, "recompP2024": null}, {"key": "AVANÇADO JP ZONA SUL", "nome": "Campus Avançado João Pessoa Zona Sul", "orcamento": 367657.71, "loa": 172481.51, "recomp": 195176.2, "recompP2024": 292764.29}, {"key": "AVANÇADO SOLEDADE", "nome": "Campus Avançado Soledade", "orcamento": 372030.79, "loa": 149669.12, "recomp": 222361.67, "recompP2024": 119733.21}, {"key": "CABEDELO", "nome": "Campus Cabedelo", "orcamento": 4469952.41, "loa": 4366979.32, "recomp": null, "recompP2024": null}, {"key": "CABEDELO CENTRO", "nome": "Campus Cabedelo Centro", "orcamento": 722869.21, "loa": 674740.44, "recomp": 48128.77, "recompP2024": 61254.79}, {"key": "CAJAZEIRAS", "nome": "Campus Cajazeiras", "orcamento": 4998765.93, "loa": 4915392.37, "recomp": null, "recompP2024": null}, {"key": "CAMPINA GRANDE", "nome": "Campus Campina Grande", "orcamento": 9733306.91, "loa": 9564475.08, "recomp": null, "recompP2024": null}, {"key": "CATOLE DO ROCHA", "nome": "Campus Catolé do Rocha", "orcamento": 1780020.43, "loa": 1666960.91, "recomp": null, "recompP2024": null}, {"key": "ESPERANCA", "nome": "Campus Esperança", "orcamento": 1497410.7, "loa": 1144907.16, "recomp": 352503.54, "recompP2024": 528755.3}, {"key": "GUARABIRA", "nome": "Campus Guarabira", "orcamento": 1490784.23, "loa": 1349873.47, "recomp": 140910.76, "recompP2024": 328791.77}, {"key": "ITABAIANA", "nome": "Campus Itabaiana", "orcamento": 1528401.27, "loa": 1308494.17, "recomp": 219907.1, "recompP2024": 146604.73}, {"key": "ITAPORANGA", "nome": "Campus Itaporanga", "orcamento": 1510846.25, "loa": 1375973.27, "recomp": 134872.98, "recompP2024": 164844.75}, {"key": "JOAO PESSOA", "nome": "Campus João Pessoa", "orcamento": 15223219.5, "loa": 14989661.89, "recomp": null, "recompP2024": null}, {"key": "MONTEIRO", "nome": "Campus Monteiro", "orcamento": 2324357.8, "loa": 2173003.62, "recomp": 151354.18, "recompP2024": 167286.2}, {"key": "PATOS", "nome": "Campus Patos", "orcamento": 3816270.35, "loa": 3595759.31, "recomp": null, "recompP2024": null}, {"key": "PEDRAS DE FOGO", "nome": "Campus Avançado Pedras de Fogo", "orcamento": 785136.52, "loa": 733819.07, "recomp": null, "recompP2024": null}, {"key": "PICUI", "nome": "Campus Picuí", "orcamento": 2822493.51, "loa": 2743913.1, "recomp": null, "recompP2024": 10543.18}, {"key": "PRINCESA ISABEL", "nome": "Campus Princesa Isabel", "orcamento": 2022548.67, "loa": 1706892.16, "recomp": 315656.51, "recompP2024": 233311.33}, {"key": "SANTA LUZIA", "nome": "Campus Santa Luzia", "orcamento": 953860.11, "loa": 636264.85, "recomp": 317595.26, "recompP2024": 476392.89}, {"key": "SANTA RITA", "nome": "Campus Santa Rita", "orcamento": 1430335.08, "loa": 1108363.19, "recomp": 321971.89, "recompP2024": 214647.92}, {"key": "SOUSA", "nome": "Campus Sousa", "orcamento": 5347544.76, "loa": 5005920.9, "recomp": null, "recompP2024": null}], "demandas": [{"id": "cons_cajazeiras", "unidade": "Campus Cajazeiras", "loaKey": "CAJAZEIRAS", "demanda": "Complementação orçamentária de custeio (demanda consolidada — diferença entre despesas relacionadas e orçamento disponível)", "valor": 457808.51, "doc": "OFÍCIO 6/2026 - DAPF/DG/CZ/REITORIA/IFPB", "just": "O documento de resposta relaciona o conjunto das despesas de custeio previstas para 2026 (24 itens, totalizando R$ 5.086.661,51), valor que corresponde, em essência, ao orçamento integral de funcionamento da unidade, e não a pedidos incrementais. Entende-se que a necessidade efetiva é a diferença entre as despesas relacionadas e o orçamento disponível, diluída no conjunto das despesas, sem destinação específica por item. O valor de R$ 457.808,51 corresponde à diferença apurada no quadro do próprio documento de resposta (as despesas relacionadas somam R$ 5.086.661,51).", "prioridade": "Indefinida", "rank": 99, "categoria": "Complementação consolidada", "obs": "Prioridade indefinida: o documento não destina o valor da diferença a itens específicos. Itens relacionados no ofício (24): Serviços de Limpeza (Empresa Soll) (R$ 1.132.130,40); Apoio administrativo e manutenção (Empresa Ideal) (R$ 1.400.596,85); Vigilância Patrimonial (Empresa Neutron) + nova licitação (R$ 555.847,15); Serviço CLAI (Empresa UNIKA) - complemento para contratação junto da Ação 21IH (R$ 410.077,94); Prime combustíveis e manutenção de veículos (R$ 172.000,00); Energisa (R$ 600.000,00); CAGEPA (R$ 6.000,00); Correios (R$ 1.000,00); Serviço de promoção de eventos (R$ 53.000,00); Edital de monitoria discente (R$ 75.400,00); Edital Projetos de Ensino (R$ 36.000,00); Almoxarifado Virtual (R$ 72.000,00); Serviço de confecção de bancadas de granito para o Laboratório de Biologia (R$ 40.000,00); Aquisição de gás e água mineral (R$ 33.204,00); Licenciamento dos veículos atuais e futuros (R$ 2.953,18); Materiais de consumo (R$ 39.146,90); Serviço de apoio administrativo - portaria (R$ 70.000,00); Taxas e obrigações tributárias (R$ 2.000,00); Internet e telefone (R$ 15.959,88); Diárias e passagens (R$ 91.000,00); Teste de seleção PSCT 2026 (R$ 100.000,00); Aquisição de materiais de consumo (hidráulicos, elétricos, manutenção predial e laboratórios) (R$ 80.853,10); Cartão de suprimento de fundos (R$ 65.492,11); Outros serviços pessoa jurídica (recarga de extintores, manutenção de equipamentos) (R$ 32.000,00)", "consolidada": true, "baseValor": "informado", "totalRelacionado": 5086661.51, "nItens": 24}, {"id": "cons_santarita", "unidade": "Campus Santa Rita", "loaKey": "SANTA RITA", "demanda": "Complementação orçamentária de custeio (demanda consolidada — diferença entre despesas relacionadas e orçamento disponível)", "valor": 451224.64, "doc": "OFÍCIO 26/2026 - DG/SR/REITORIA/IFPB", "just": "O documento de resposta relaciona o conjunto das despesas de custeio previstas para 2026 (38 itens, totalizando R$ 2.680.731,64), valor que corresponde, em essência, ao orçamento integral de funcionamento da unidade, e não a pedidos incrementais. Entende-se que a necessidade efetiva é a diferença entre as despesas relacionadas e o orçamento disponível, diluída no conjunto das despesas, sem destinação específica por item. O valor de R$ 451.224,64 corresponde à valor total de solicitação indicado no quadro resumo do documento, que relaciona as demandas com valores abaixo do planejamento (as despesas relacionadas somam R$ 2.680.731,64).", "prioridade": "Indefinida", "rank": 99, "categoria": "Complementação consolidada", "obs": "Prioridade indefinida: o documento não destina o valor da diferença a itens específicos. Itens relacionados no ofício (38): Diárias de capacitação (R$ 20.000,00); Edital ressarcimento (R$ 8.000,00); Reembolso de passagens (R$ 2.000,00); Monitoria (R$ 12.000,00); Ajuda de custo para estudantes - visitas técnicas (R$ 50.000,00); Suprimento de fundos (R$ 30.000,00); Material de expediente (R$ 15.000,00); Água mineral (R$ 4.000,00); Diárias de servidores (R$ 15.000,00); Ressarcimento de passagens de servidores (R$ 2.000,00); Fardamento para servidores (R$ 2.570,00); Taxa do poço artesiano (R$ 150,00); Diária de colaborador eventual (R$ 2.000,00); Redes para o ginásio (R$ 5.247,90); Festival de Intérpretes (R$ 5.000,00); Contrato de energia elétrica (R$ 219.316,34); Contrato de apoio administrativo (R$ 193.314,24); Contrato de vigilância armada (R$ 406.198,56); Contrato de limpeza e manutenção (R$ 541.061,95); Pendências do contrato anterior de limpeza e manutenção (R$ 29.874,25); Contrato de outsourcing impressão (R$ 9.030,00); Contrato de gerenciamento de frotas (R$ 34.759,91); Contrato de locação de transportes - fretamento (R$ 38.419,00); Edital Interconecta - taxa de bancada (R$ 21.000,00); Edital PROBEXT - taxa de bancada (R$ 36.000,00); Edital EVENTOS - taxa de bancada (R$ 15.000,00); Edital PROAF - taxa de bancada (R$ 4.000,00); Edital Interconecta - bolsas (R$ 41.400,00); Edital PROBEXT - bolsas (R$ 33.000,00); Edital EVENTOS - bolsas (R$ 7.200,00); Edital PROAF - bolsas (R$ 3.600,00); Fardamento para estudantes (R$ 33.410,00); Exame eletrocardiograma (R$ 6.000,00); Absorventes (R$ 10.000,00); PAPE 1º semestre (R$ 289.600,00); PAPE 2º semestre (R$ 26.805,25); Edital aquisição de óculos (R$ 10.426,00); Contrato CLAI - profissionais especializados (R$ 498.348,24)", "consolidada": true, "baseValor": "informado", "totalRelacionado": 2680731.64, "nItens": 38}, {"id": "cons_pedrasfogo", "unidade": "Campus Avançado Pedras de Fogo", "loaKey": "PEDRAS DE FOGO", "demanda": "Complementação orçamentária de custeio (demanda consolidada — diferença entre despesas relacionadas e orçamento disponível)", "valor": 300000.0, "doc": "OFÍCIO 345/2026 - GFC/CFC/DCCL/PRAF/REITORIA/IFPB", "just": "O documento de resposta relaciona o conjunto das despesas de custeio previstas para 2026 (7 itens, totalizando R$ 677.339,10), valor que corresponde, em essência, ao orçamento integral de funcionamento da unidade, e não a pedidos incrementais. Entende-se que a necessidade efetiva é a diferença entre as despesas relacionadas e o orçamento disponível, diluída no conjunto das despesas, sem destinação específica por item. O valor de R$ 300.000,00 corresponde à complementação total solicitada expressamente no ofício (as despesas relacionadas somam R$ 677.339,10).", "prioridade": "Indefinida", "rank": 99, "categoria": "Complementação consolidada", "obs": "Prioridade indefinida: o documento não destina o valor da diferença a itens específicos. Itens relacionados no ofício (7): Contrato 14/2022 - vigilância e segurança patrimonial - 5S Segurança de Valores Eireli (R$ 132.822,24); Contratação de 01 novo posto de auxiliar de serviços gerais (ASG) (sem valor discriminado); Contrato 46/2023 - limpeza, asseio e conservação predial - Paraná Limp (R$ 164.866,56); Contrato 11/2026 - fretamento/transporte - Kadesch Construções e Terceirizações (R$ 309.650,30); Contrato 13/2023 - gerenciamento de frota e manutenção - Prime (R$ 50.000,00); Contrato 09/2024 - fornecimento contínuo de água mineral (R$ 5.000,00); Contrato 16/2024 - serviços de fretamento - Paraíba Turismo Ltda (R$ 15.000,00)", "consolidada": true, "baseValor": "informado", "totalRelacionado": 677339.1, "nItens": 7}, {"id": "cons_patos", "unidade": "Campus Patos", "loaKey": "PATOS", "demanda": "Complementação orçamentária de custeio (demanda consolidada — diferença entre despesas relacionadas e orçamento disponível)", "valor": 1011757.74, "doc": "OFÍCIO 1/2026 - COPLAN/DAPF/DG/PT/REITORIA/IFPB", "just": "O documento de resposta relaciona o conjunto das despesas de custeio previstas para 2026 (22 itens, totalizando R$ 4.828.028,09), valor que corresponde, em essência, ao orçamento integral de funcionamento da unidade, e não a pedidos incrementais. Entende-se que a necessidade efetiva é a diferença entre as despesas relacionadas e o orçamento disponível, diluída no conjunto das despesas, sem destinação específica por item. Valor apurado neste painel pela diferença entre o total relacionado (R$ 4.828.028,09) e o orçamento da unidade (R$ 3.816.270,35 — LOA mais recomposições e distribuições extras decorrentes dos índices de qualidade). Sujeito a ajuste caso o documento indique quadro resumo com valor de solicitação próprio, a exemplo de Cajazeiras e Santa Rita.", "prioridade": "Indefinida", "rank": 99, "categoria": "Complementação consolidada", "obs": "Prioridade indefinida: o documento não destina o valor da diferença a itens específicos. Itens relacionados no ofício (22): Serviços de limpeza (R$ 1.100.000,00); Apoio administrativo e manutenção (R$ 950.000,00); Vigilância patrimonial (R$ 550.450,15); Serviço CLAI - complemento para contratação junto da Ação 21IH (R$ 400.077,94); Prime combustíveis e manutenção de veículos (R$ 180.000,00); Energisa (R$ 750.000,00); CAGEPA (R$ 80.000,00); Correios (R$ 5.000,00); Serviço de promoção de eventos (R$ 60.000,00); Edital de monitoria discente (R$ 75.000,00); Edital Projetos de Ensino (R$ 55.000,00); Almoxarifado Virtual (R$ 85.000,00); Aquisição de gás e água mineral (R$ 35.000,00); Licenciamento dos veículos atuais e futuros (R$ 3.500,00); Materiais de consumo (R$ 120.000,00); Serviço de apoio administrativo - portaria (R$ 80.000,00); Taxas e obrigações tributárias (R$ 2.000,00); Internet e telefone (R$ 15.000,00); Diárias e passagens (R$ 110.000,00); Aquisição de materiais de consumo (hidráulicos, elétricos, manutenção predial e laboratórios) (R$ 80.000,00); Cartão de suprimento de fundos (R$ 60.000,00); Outros serviços pessoa jurídica (recarga de extintores, manutenção de equipamentos) (R$ 32.000,00)", "consolidada": true, "baseValor": "apurado", "totalRelacionado": 4828028.09, "nItens": 22}, {"id": "cons_sousa", "unidade": "Campus Sousa", "loaKey": "SOUSA", "demanda": "Complementação orçamentária de custeio (demanda consolidada — diferença entre despesas relacionadas e orçamento disponível)", "valor": 0.0, "doc": "OFÍCIO 77/2026 - DAP/DG/SS/REITORIA/IFPB", "just": "O documento de resposta relaciona o conjunto das despesas de custeio previstas para 2026 (21 itens, totalizando R$ 5.090.000,00), valor que corresponde, em essência, ao orçamento integral de funcionamento da unidade, e não a pedidos incrementais. Entende-se que a necessidade efetiva é a diferença entre as despesas relacionadas e o orçamento disponível, diluída no conjunto das despesas, sem destinação específica por item. A diferença apurada neste painel entre o total relacionado (R$ 5.090.000,00) e o orçamento da unidade (R$ 5.347.544,76) é negativa (R$ -257.544,76), indicando que as despesas relacionadas estão dentro do orçamento disponível. O valor da demanda foi registrado como R$ 0,00 até verificação do documento original, que pode conter quadro resumo com valor de solicitação próprio.", "prioridade": "Indefinida", "rank": 99, "categoria": "Complementação consolidada", "obs": "Prioridade indefinida: o documento não destina o valor da diferença a itens específicos. ATENÇÃO: diferença apurada negativa — verificar no documento se há quadro resumo com valor de solicitação próprio, a exemplo de Cajazeiras e Santa Rita. Itens relacionados no ofício (21): Energia elétrica (R$ 610.000,00); Água tratada (R$ 85.000,00); Ração animal (R$ 100.000,00); Terceirizados - custeio (R$ 3.320.000,00); Desinsetização (R$ 11.520,00); Materiais de consumo para almoxarifado (R$ 96.628,84); Manutenção veicular (R$ 211.500,00); Combustíveis (R$ 201.390,00); Locação de máquinas de xerox (R$ 30.000,00); Locação de veículos (R$ 45.283,52); Manutenção rede elétrica (R$ 6.500,00); Manutenção de ar-condicionados (R$ 90.000,00); Manutenção extintores (R$ 16.750,00); Telhas do bloco de agroecologia (R$ 17.747,50); Suprimento de fundos (R$ 60.000,00); Diárias (R$ 100.000,00); Passagem aérea (R$ 24.310,30); Passagem terrestre (R$ 10.000,00); Publicidade legal (EBC) (R$ 10.000,00); Banco de preços (R$ 12.300,00); Outras despesas (R$ 31.069,84)", "consolidada": true, "baseValor": "apurado", "totalRelacionado": 5090000.0, "nItens": 21}, {"id": "cons_santaluzia", "unidade": "Campus Santa Luzia", "loaKey": "SANTA LUZIA", "demanda": "Complementação orçamentária de custeio (demanda consolidada — diferença entre despesas relacionadas e orçamento disponível)", "valor": 733591.83, "doc": "OFÍCIO 13/2026 - DG/SL/REITORIA/IFPB", "just": "O documento de resposta relaciona o conjunto das despesas de custeio previstas para 2026 (12 itens, totalizando R$ 1.687.451,94), valor que corresponde, em essência, ao orçamento integral de funcionamento da unidade, e não a pedidos incrementais. Entende-se que a necessidade efetiva é a diferença entre as despesas relacionadas e o orçamento disponível, diluída no conjunto das despesas, sem destinação específica por item. Valor apurado neste painel pela diferença entre o total relacionado (R$ 1.687.451,94) e o orçamento da unidade (R$ 953.860,11 — LOA mais recomposições e distribuições extras decorrentes dos índices de qualidade). Sujeito a ajuste caso o documento indique quadro resumo com valor de solicitação próprio, a exemplo de Cajazeiras e Santa Rita.", "prioridade": "Indefinida", "rank": 99, "categoria": "Complementação consolidada", "obs": "Prioridade indefinida: o documento não destina o valor da diferença a itens específicos. Itens relacionados no ofício (12): Energisa - energia elétrica (R$ 212.192,77); BRS Suprimentos - almoxarifado virtual (R$ 59.288,06); Prime Consultoria - gestão de frota (R$ 83.396,40); Asa Rent a Car - locação de veículo (R$ 43.566,09); Cagepa - fornecimento de água (R$ 71.821,44); Copy Line - impressoras (R$ 33.576,91); Oca Viagens e Turismo - passagens aéreas (R$ 64.171,63); Panificadora Basílio - água mineral (R$ 33.750,00); Mega Service - motorista, copeira e auxiliar de manutenção predial (R$ 185.349,60); Zelo Locação de Mão de Obra - técnico em refrigeração (R$ 100.971,24); ProntServ Prestação de Serviços - limpeza e conservação (R$ 426.223,96); Neutron Segurança Privada - vigilância e segurança patrimonial (R$ 373.143,84)", "consolidada": true, "baseValor": "apurado", "totalRelacionado": 1687451.94, "nItens": 12}, {"id": "cons_itaporanga", "unidade": "Campus Itaporanga", "loaKey": "ITAPORANGA", "demanda": "Complementação orçamentária de custeio (demanda consolidada — diferença entre despesas relacionadas e orçamento disponível)", "valor": 523114.34, "doc": "OFÍCIO 18/2026 - DAPF/DG/IP/REITORIA/IFPB", "just": "O documento de resposta relaciona o conjunto das despesas de custeio previstas para 2026 (12 itens, totalizando R$ 2.033.960,59), valor que corresponde, em essência, ao orçamento integral de funcionamento da unidade, e não a pedidos incrementais. Entende-se que a necessidade efetiva é a diferença entre as despesas relacionadas e o orçamento disponível, diluída no conjunto das despesas, sem destinação específica por item. Valor apurado neste painel pela diferença entre o total relacionado (R$ 2.033.960,59) e o orçamento da unidade (R$ 1.510.846,25 — LOA mais recomposições e distribuições extras decorrentes dos índices de qualidade). Sujeito a ajuste caso o documento indique quadro resumo com valor de solicitação próprio, a exemplo de Cajazeiras e Santa Rita.", "prioridade": "Indefinida", "rank": 99, "categoria": "Complementação consolidada", "obs": "Prioridade indefinida: o documento não destina o valor da diferença a itens específicos. Itens relacionados no ofício (12): Zelo Locação de Mão de Obra - ASG, motorista, porteiro e recepcionista (R$ 945.633,92); Gran Forte - vigilância armada diurna e noturna (R$ 273.763,20); Ideal Conservação e Limpeza de Prédios - técnico em refrigeração e apoio adm/copeiro (R$ 114.440,56); UNIKA Terceirização e Serviços - apoio especializado CLAI (psicopedagogo e assistente educacional inclusivo) (R$ 199.769,90); Energisa - energia elétrica (R$ 201.312,56); Cagepa - água e esgoto (R$ 61.256,87); Autopel - almoxarifado virtual (R$ 40.086,96); Copy Line - outsourcing de impressão (R$ 23.656,32); Correios - postagens e correspondências (R$ 4.600,00); Prime - gerenciamento de frota (R$ 71.642,40); Viver Eventos - eventos esportivos e institucionais (R$ 48.000,00); RCB Refrigeração - instalação e manutenção de ar-condicionado (R$ 49.797,90)", "consolidada": true, "baseValor": "apurado", "totalRelacionado": 2033960.59, "nItens": 12}, {"id": "cons_cabedelocentro", "unidade": "Campus Cabedelo Centro", "loaKey": "CABEDELO CENTRO", "demanda": "Complementação orçamentária de custeio (demanda consolidada — diferença entre despesas relacionadas e orçamento disponível)", "valor": 141174.47, "doc": "OFÍCIO 60/2026 - DCACC/REITORIA/IFPB", "just": "O documento de resposta relaciona o conjunto das despesas de custeio previstas para 2026 (5 itens, totalizando R$ 864.043,68), valor que corresponde, em essência, ao orçamento integral de funcionamento da unidade, e não a pedidos incrementais. Entende-se que a necessidade efetiva é a diferença entre as despesas relacionadas e o orçamento disponível, diluída no conjunto das despesas, sem destinação específica por item. Valor apurado neste painel pela diferença entre o total relacionado (R$ 864.043,68) e o orçamento da unidade (R$ 722.869,21 — LOA mais recomposições e distribuições extras decorrentes dos índices de qualidade). Sujeito a ajuste caso o documento indique quadro resumo com valor de solicitação próprio, a exemplo de Cajazeiras e Santa Rita.", "prioridade": "Indefinida", "rank": 99, "categoria": "Complementação consolidada", "obs": "Prioridade indefinida: o documento não destina o valor da diferença a itens específicos. Itens relacionados no ofício (5): Contrato IDEAL - apoio administrativo (R$ 368.412,96); Contrato ARESPB - vigilância (R$ 149.598,72); Contrato PRIME - gestão de frota (R$ 70.000,00); Contrato PRONTSERV - limpeza (R$ 241.032,00); Contrato PARAÍBA TURISMO - fretamento (R$ 35.000,00)", "consolidada": true, "baseValor": "apurado", "totalRelacionado": 864043.68, "nItens": 5}, {"id": "d000", "unidade": "Campus Avançado Areia", "loaKey": "AVANÇADO AREIA", "demanda": "Aquisição de materiais e utensílios para copa e Laboratório do Curso Técnico em Gastronomia", "valor": 25000.0, "doc": "OFÍCIO 93/2026 - DCAAREIA/REITORIA/IFPB", "just": "Indispensável para aulas práticas, atividades de ensino, projetos integradores e ações acadêmicas do Curso Técnico em Gastronomia; os materiais atuais são insuficientes/desgastados e a aquisição melhora segurança, higiene, organização e qualidade do ensino-aprendizagem.", "prioridade": "Prioridade 1", "rank": 1, "categoria": "Material de consumo/equipamentos de apoio", "obs": "", "consolidada": false}, {"id": "d001", "unidade": "Campus Avançado Areia", "loaKey": "AVANÇADO AREIA", "demanda": "Aquisição de insumos para aulas práticas do Curso Técnico em Gastronomia", "valor": 20000.0, "doc": "OFÍCIO 93/2026 - DCAAREIA/REITORIA/IFPB", "just": "Necessária para execução das práticas culinárias, aplicação de conhecimentos teóricos, desenvolvimento de habilidades técnicas e cumprimento das exigências curriculares do curso.", "prioridade": "Prioridade 2", "rank": 2, "categoria": "Insumos pedagógicos", "obs": "", "consolidada": false}, {"id": "d002", "unidade": "Campus Avançado Areia", "loaKey": "AVANÇADO AREIA", "demanda": "Reforma do espaço destinado ao preparo dos alimentos dos estudantes", "valor": 5000.0, "doc": "OFÍCIO 93/2026 - DCAAREIA/REITORIA/IFPB", "just": "Decorre do desgaste das instalações e da necessidade de adequações em revestimentos, instalações elétricas/hidráulicas, ventilação, iluminação e ambientes de manipulação/armazenamento de alimentos; visa segurança alimentar e melhores condições de trabalho.", "prioridade": "Prioridade 3", "rank": 3, "categoria": "Infraestrutura", "obs": "", "consolidada": false}, {"id": "d008", "unidade": "Campus Cabedelo", "loaKey": "CABEDELO", "demanda": "Suplementação do contrato Zêlo - serviços terceirizados CLAI-CB", "valor": 199271.56, "doc": "OFÍCIO 32/2026 - DAPF/DG/CB/REITORIA/IFPB", "just": "Necessária para honrar compromisso financeiro com contrato essencial ao funcionamento do setor CLAI-CB até dezembro de 2026, considerando dotação disponível insuficiente.", "prioridade": "Prioridade 1", "rank": 1, "categoria": "Contrato continuado/CLAI", "obs": "O documento também registra custo anual R$ 809.956,20 e demanda de 8 meses.", "consolidada": false}, {"id": "d009", "unidade": "Campus Cabedelo", "loaKey": "CABEDELO", "demanda": "Suplementação de ações de Assistência Estudantil - auxílio financeiro", "valor": 108943.23, "doc": "OFÍCIO 32/2026 - DAPF/DG/CB/REITORIA/IFPB", "just": "Despesa consolidada de auxílio financeiro ultrapassou a LOA; mesmo após remanejamento interno de R$ 137.987,00, restou saldo negativo.", "prioridade": "Prioridade 2", "rank": 2, "categoria": "Assistência estudantil", "obs": "", "consolidada": false}, {"id": "d010", "unidade": "Campus Cabedelo", "loaKey": "CABEDELO", "demanda": "Aplicação de mantas impermeabilizantes nas calhas dos blocos", "valor": 50000.0, "doc": "OFÍCIO 32/2026 - DAPF/DG/CB/REITORIA/IFPB", "just": "Justificada por múltiplos pontos críticos de infiltração que ameaçam a integridade das salas de aula e laboratórios.", "prioridade": "Prioridade 3", "rank": 3, "categoria": "Infraestrutura", "obs": "", "consolidada": false}, {"id": "d011", "unidade": "Campus Cabedelo", "loaKey": "CABEDELO", "demanda": "Manutenção corretiva e preventiva da caixa d'água", "valor": 60000.0, "doc": "OFÍCIO 32/2026 - DAPF/DG/CB/REITORIA/IFPB", "just": "Indispensável para assegurar potabilidade e regular abastecimento de água do complexo de blocos didáticos.", "prioridade": "Prioridade 3", "rank": 3, "categoria": "Infraestrutura", "obs": "", "consolidada": false}, {"id": "d012", "unidade": "Campus Cabedelo", "loaKey": "CABEDELO", "demanda": "Demolição e destinação de estrutura de alvenaria remanescente", "valor": 45000.0, "doc": "OFÍCIO 32/2026 - DAPF/DG/CB/REITORIA/IFPB", "just": "Remoção de estruturas deixadas pelo canteiro de obras anterior, visando desobstrução e segurança das áreas de circulação.", "prioridade": "Prioridade 3", "rank": 3, "categoria": "Infraestrutura", "obs": "", "consolidada": false}, {"id": "d037", "unidade": "Campus Campina Grande", "loaKey": "CAMPINA GRANDE", "demanda": "Ajuda de custo para 106 estudantes participarem dos Jogos Intercampi do IFPB no Campus Patos", "valor": 90630.0, "doc": "OFÍCIO 75/2026 - DG/CG/REITORIA/IFPB", "just": "Valor estimado contempla alimentação e hospedagem dos estudantes participantes.", "prioridade": "Não informado", "rank": 99, "categoria": "Assistência/apoio estudantil", "obs": "", "consolidada": false}, {"id": "d038", "unidade": "Campus Esperança", "loaKey": "ESPERANCA", "demanda": "Limpeza", "valor": 337740.55, "doc": "OFÍCIO 20/2026 - DG/ES/REITORIA/IFPB", "just": "Necessidade decorre da diminuição do orçamento em relação ao ano anterior, somada ao aumento dos valores dos contratos por repactuações, ocasionando déficit orçamentário na ação 20RL.", "prioridade": "Prioridade 1", "rank": 1, "categoria": "Contrato continuado", "obs": "Contrato 01/2025; total anual R$ 491.206,68; empenhado R$ 153.466,13.", "consolidada": false}, {"id": "d039", "unidade": "Campus Esperança", "loaKey": "ESPERANCA", "demanda": "Vigilância armada", "valor": 269823.88, "doc": "OFÍCIO 20/2026 - DG/ES/REITORIA/IFPB", "just": "Necessidade decorre da diminuição do orçamento em relação ao ano anterior, somada ao aumento dos valores dos contratos por repactuações, ocasionando déficit orçamentário na ação 20RL.", "prioridade": "Prioridade 2", "rank": 2, "categoria": "Contrato continuado", "obs": "Contrato 04/2025; total anual R$ 399.739,08; empenhado R$ 129.915,20.", "consolidada": false}, {"id": "d040", "unidade": "Campus Esperança", "loaKey": "ESPERANCA", "demanda": "CLAI (complemento)", "valor": 70596.97, "doc": "OFÍCIO 20/2026 - DG/ES/REITORIA/IFPB", "just": "Necessidade decorre da diminuição do orçamento em relação ao ano anterior, somada ao aumento dos valores dos contratos por repactuações, ocasionando déficit orçamentário na ação 20RL.", "prioridade": "Prioridade 3", "rank": 3, "categoria": "Contrato continuado", "obs": "Contrato 04/2026; sem empenho informado.", "consolidada": false}, {"id": "d041", "unidade": "Campus Esperança", "loaKey": "ESPERANCA", "demanda": "Manutenção", "valor": 63608.49, "doc": "OFÍCIO 20/2026 - DG/ES/REITORIA/IFPB", "just": "Necessidade decorre da diminuição do orçamento em relação ao ano anterior, somada ao aumento dos valores dos contratos por repactuações, ocasionando déficit orçamentário na ação 20RL.", "prioridade": "Prioridade 4", "rank": 4, "categoria": "Contrato continuado", "obs": "Contrato 44/2022; total anual R$ 85.258,80; empenhado R$ 21.650,31.", "consolidada": false}, {"id": "d042", "unidade": "Campus Guarabira", "loaKey": "GUARABIRA", "demanda": "Déficit de custeio - contrato de terceirização", "valor": 461003.31, "doc": "OFÍCIO 53/2026 - DG/GB/REITORIA/IFPB", "just": "As demandas refletem necessidades prioritárias para garantia do pleno funcionamento das atividades acadêmicas e administrativas do campus.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d043", "unidade": "Campus Guarabira", "loaKey": "GUARABIRA", "demanda": "Reforma da portaria, pintura do prédio e correção do gesso quebrado", "valor": 60000.0, "doc": "OFÍCIO 53/2026 - DG/GB/REITORIA/IFPB", "just": "As demandas refletem necessidades prioritárias para garantia do pleno funcionamento das atividades acadêmicas e administrativas do campus.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d044", "unidade": "Campus Guarabira", "loaKey": "GUARABIRA", "demanda": "Compra de material de consumo e expediente", "valor": 30000.0, "doc": "OFÍCIO 53/2026 - DG/GB/REITORIA/IFPB", "just": "As demandas refletem necessidades prioritárias para garantia do pleno funcionamento das atividades acadêmicas e administrativas do campus.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d045", "unidade": "Campus Guarabira", "loaKey": "GUARABIRA", "demanda": "Poço artesiano - instalação e equipamento", "valor": 40000.0, "doc": "OFÍCIO 53/2026 - DG/GB/REITORIA/IFPB", "just": "As demandas refletem necessidades prioritárias para garantia do pleno funcionamento das atividades acadêmicas e administrativas do campus.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d058", "unidade": "Campus João Pessoa", "loaKey": "JOAO PESSOA", "demanda": "Aporte financeiro suplementar para cobertura de déficit no custeio operacional e recomposição de margem afetada pela CLAI", "valor": 919000.0, "doc": "OFÍCIO 48/2026 - DG/JP/REITORIA/IFPB", "just": "Necessário para mitigar déficit projetado de aproximadamente R$ 900.000,00; aumento dos contratos de mão de obra continuada, em especial CLAI, comprometeu cerca de 75% da dotação e ameaça despesas operacionais básicas. Gestão informa redimensionamento via novos SRPs.", "prioridade": "Não informado", "rank": 99, "categoria": "Suplementação de custeio", "obs": "", "consolidada": false}, {"id": "d059", "unidade": "Campus Avançado João Pessoa Zona Sul", "loaKey": "AVANÇADO JP ZONA SUL", "demanda": "Pagamento de contrato de limpeza - ProntServ (reforço)", "valor": 176510.17, "doc": "OFÍCIO 32/2026 - DG/REITORIA/IFPB", "just": "O documento informa insuficiência do valor recebido na ação 20RL e necessidade de complementação para garantir continuidade das atividades administrativas, acadêmicas e estruturantes.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d060", "unidade": "Campus Avançado João Pessoa Zona Sul", "loaKey": "AVANÇADO JP ZONA SUL", "demanda": "Pagamento de contrato de vigilância - 5S (reforço)", "valor": 195525.35, "doc": "OFÍCIO 32/2026 - DG/REITORIA/IFPB", "just": "O documento informa insuficiência do valor recebido na ação 20RL e necessidade de complementação para garantir continuidade das atividades administrativas, acadêmicas e estruturantes.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d061", "unidade": "Campus Avançado João Pessoa Zona Sul", "loaKey": "AVANÇADO JP ZONA SUL", "demanda": "Pagamento de contrato de impressão (reforço)", "valor": 12473.28, "doc": "OFÍCIO 32/2026 - DG/REITORIA/IFPB", "just": "O documento informa insuficiência do valor recebido na ação 20RL e necessidade de complementação para garantir continuidade das atividades administrativas, acadêmicas e estruturantes.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d062", "unidade": "Campus Avançado João Pessoa Zona Sul", "loaKey": "AVANÇADO JP ZONA SUL", "demanda": "Pagamento de contrato de limpeza - restos a pagar (dez/2026-jan/2027)", "valor": 49806.66, "doc": "OFÍCIO 32/2026 - DG/REITORIA/IFPB", "just": "O documento informa insuficiência do valor recebido na ação 20RL e necessidade de complementação para garantir continuidade das atividades administrativas, acadêmicas e estruturantes.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d063", "unidade": "Campus Avançado João Pessoa Zona Sul", "loaKey": "AVANÇADO JP ZONA SUL", "demanda": "Pagamento de contrato de vigilância - restos a pagar (dez/2026-jan/2027)", "valor": 45500.0, "doc": "OFÍCIO 32/2026 - DG/REITORIA/IFPB", "just": "O documento informa insuficiência do valor recebido na ação 20RL e necessidade de complementação para garantir continuidade das atividades administrativas, acadêmicas e estruturantes.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d064", "unidade": "Campus Avançado João Pessoa Zona Sul", "loaKey": "AVANÇADO JP ZONA SUL", "demanda": "Pagamento de contrato de impressão - restos a pagar (dez/2026-jan/2027)", "valor": 3500.0, "doc": "OFÍCIO 32/2026 - DG/REITORIA/IFPB", "just": "O documento informa insuficiência do valor recebido na ação 20RL e necessidade de complementação para garantir continuidade das atividades administrativas, acadêmicas e estruturantes.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d065", "unidade": "Campus Avançado João Pessoa Zona Sul", "loaKey": "AVANÇADO JP ZONA SUL", "demanda": "Diárias e passagens - prioridade para missão institucional", "valor": 15000.0, "doc": "OFÍCIO 32/2026 - DG/REITORIA/IFPB", "just": "O documento informa insuficiência do valor recebido na ação 20RL e necessidade de complementação para garantir continuidade das atividades administrativas, acadêmicas e estruturantes.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d066", "unidade": "Campus Avançado João Pessoa Zona Sul", "loaKey": "AVANÇADO JP ZONA SUL", "demanda": "Coffee break", "valor": 8260.0, "doc": "OFÍCIO 32/2026 - DG/REITORIA/IFPB", "just": "O documento informa insuficiência do valor recebido na ação 20RL e necessidade de complementação para garantir continuidade das atividades administrativas, acadêmicas e estruturantes.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d067", "unidade": "Campus Avançado João Pessoa Zona Sul", "loaKey": "AVANÇADO JP ZONA SUL", "demanda": "Aquisição de materiais de expediente", "valor": 30000.0, "doc": "OFÍCIO 32/2026 - DG/REITORIA/IFPB", "just": "O documento informa insuficiência do valor recebido na ação 20RL e necessidade de complementação para garantir continuidade das atividades administrativas, acadêmicas e estruturantes.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d068", "unidade": "Campus Monteiro", "loaKey": "MONTEIRO", "demanda": "Complementação orçamentária para o contrato da CLAI", "valor": 323000.0, "doc": "OFÍCIO 57/2026 - DAPF/DG/MT/REITORIA/IFPB", "just": "Contrato orçado em R$ 1.396.219,40; postos contratados aproximam R$ 600.000,00, mas campus receberá R$ 270.610,07, exigindo aporte para garantir atendimento especializado aos estudantes.", "prioridade": "Prioridade 01", "rank": 1, "categoria": "Custeio/infraestrutura", "obs": "Processo associado: 23171.000545.2025-16", "consolidada": false}, {"id": "d069", "unidade": "Campus Monteiro", "loaKey": "MONTEIRO", "demanda": "Complementação orçamentária para contrato de fornecimento de refeições no Restaurante Estudantil", "valor": 220000.0, "doc": "OFÍCIO 57/2026 - DAPF/DG/MT/REITORIA/IFPB", "just": "Contrato acima de R$ 600.000,00; campus receberá aproximadamente R$ 400.000,00, incluindo suplementação da ação 21IV. Justificativa vinculada à relação entre alimentação e desempenho escolar.", "prioridade": "Prioridade 01", "rank": 1, "categoria": "Custeio/infraestrutura", "obs": "Processo associado: 23171.001588.2024-38", "consolidada": false}, {"id": "d070", "unidade": "Campus Monteiro", "loaKey": "MONTEIRO", "demanda": "Complementação orçamentária para contratos do PNAE", "valor": 130000.0, "doc": "OFÍCIO 57/2026 - DAPF/DG/MT/REITORIA/IFPB", "just": "Aumento expressivo de alunos da educação básica; custo dos lanches do PNAE gira em torno de R$ 250.000,00, contra recebimento aproximado de R$ 120.000,00.", "prioridade": "Prioridade 01", "rank": 1, "categoria": "Custeio/infraestrutura", "obs": "Processo associado: 23171.000454.2026-61", "consolidada": false}, {"id": "d071", "unidade": "Campus Monteiro", "loaKey": "MONTEIRO", "demanda": "Instalação de cerca concertina no muro do entorno do campus", "valor": 50000.0, "doc": "OFÍCIO 57/2026 - DAPF/DG/MT/REITORIA/IFPB", "just": "Reforçar segurança perimetral, protegendo alunos, servidores, terceirizados, visitantes e patrimônio público, considerando localização em entorno de áreas vulneráveis.", "prioridade": "Prioridade 02", "rank": 2, "categoria": "Custeio/infraestrutura", "obs": "Processo associado: 23171.000013.2024-06", "consolidada": false}, {"id": "d072", "unidade": "Campus Monteiro", "loaKey": "MONTEIRO", "demanda": "Aquisição de material de consumo para manutenção predial", "valor": 80000.0, "doc": "OFÍCIO 57/2026 - DAPF/DG/MT/REITORIA/IFPB", "just": "Campus possui 16 anos de implantação e requer manutenção preventiva/corretiva diária para garantir segurança, funcionalidade e durabilidade das edificações.", "prioridade": "Prioridade 02", "rank": 2, "categoria": "Custeio/infraestrutura", "obs": "Processo associado: 23171.000309.2025-08", "consolidada": false}, {"id": "d073", "unidade": "Campus Monteiro", "loaKey": "MONTEIRO", "demanda": "Sistema de sinalização e acessibilidade padronizado", "valor": 392000.0, "doc": "OFÍCIO 57/2026 - DAPF/DG/MT/REITORIA/IFPB", "just": "Implantar sistema gráfico e direcional de sinalização e acessibilidade para orientar público interno e externo, agilizar o trabalho e reduzir dificuldades de obtenção de informações.", "prioridade": "Prioridade 02", "rank": 2, "categoria": "Custeio/infraestrutura", "obs": "Processo associado: 23171.001265.2025-25", "consolidada": false}, {"id": "d074", "unidade": "Campus Monteiro", "loaKey": "MONTEIRO", "demanda": "Pintura com tinta epóxi e demarcação da quadra poliesportiva", "valor": 150000.0, "doc": "OFÍCIO 57/2026 - DAPF/DG/MT/REITORIA/IFPB", "just": "Ginásio tem mais de 30 anos; piso encontra-se escorregadio e a equipe de engenharia recomendou pintura epóxi e demarcação.", "prioridade": "Prioridade 03", "rank": 3, "categoria": "Custeio/infraestrutura", "obs": "Processo associado: 23171.000523.2026-37", "consolidada": false}, {"id": "d075", "unidade": "Campus Monteiro", "loaKey": "MONTEIRO", "demanda": "Instalação de toldos para áreas de convivência", "valor": 100000.0, "doc": "OFÍCIO 57/2026 - DAPF/DG/MT/REITORIA/IFPB", "just": "Necessária para oferecer espaços adequados de convivência, especialmente a estudantes do ensino médio em dois turnos ou residentes em outros municípios.", "prioridade": "Prioridade 03", "rank": 3, "categoria": "Custeio/infraestrutura", "obs": "Sem processo associado informado.", "consolidada": false}, {"id": "d105", "unidade": "Campus Picuí", "loaKey": "PICUI", "demanda": "Repactuação dos contratos vigentes", "valor": 250000.0, "doc": "OFÍCIO 72/2026 - DG/PC/REITORIA/IFPB", "just": "Não há justificativa individual apresentada; o ofício lista as prioridades do Campus Picuí para 2026 na ação 20RL.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d106", "unidade": "Campus Picuí", "loaKey": "PICUI", "demanda": "Aporte de orçamento na contratação de terceirizados para a CLAI", "valor": 240000.0, "doc": "OFÍCIO 72/2026 - DG/PC/REITORIA/IFPB", "just": "Não há justificativa individual apresentada; o ofício lista as prioridades do Campus Picuí para 2026 na ação 20RL.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d107", "unidade": "Campus Picuí", "loaKey": "PICUI", "demanda": "Contratação de mais um terceirizado para apoio à EAD", "valor": 50000.0, "doc": "OFÍCIO 72/2026 - DG/PC/REITORIA/IFPB", "just": "Não há justificativa individual apresentada; o ofício lista as prioridades do Campus Picuí para 2026 na ação 20RL.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d108", "unidade": "Campus Picuí", "loaKey": "PICUI", "demanda": "Adequação do contrato de limpeza com contratação de mais um terceirizado", "valor": 50000.0, "doc": "OFÍCIO 72/2026 - DG/PC/REITORIA/IFPB", "just": "Não há justificativa individual apresentada; o ofício lista as prioridades do Campus Picuí para 2026 na ação 20RL.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d109", "unidade": "Campus Picuí", "loaKey": "PICUI", "demanda": "Recuperação e funcionamento dos elevadores", "valor": 50000.0, "doc": "OFÍCIO 72/2026 - DG/PC/REITORIA/IFPB", "just": "Não há justificativa individual apresentada; o ofício lista as prioridades do Campus Picuí para 2026 na ação 20RL.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d110", "unidade": "Campus Picuí", "loaKey": "PICUI", "demanda": "Serviço de revestimento interno em pastilha nas salas de aula", "valor": 100000.0, "doc": "OFÍCIO 72/2026 - DG/PC/REITORIA/IFPB", "just": "Não há justificativa individual apresentada; o ofício lista as prioridades do Campus Picuí para 2026 na ação 20RL.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d111", "unidade": "Campus Picuí", "loaKey": "PICUI", "demanda": "Compra de itens de consumo de manutenção predial, principalmente portas para sala de aula e laboratório", "valor": 200000.0, "doc": "OFÍCIO 72/2026 - DG/PC/REITORIA/IFPB", "just": "Não há justificativa individual apresentada; o ofício lista as prioridades do Campus Picuí para 2026 na ação 20RL.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d112", "unidade": "Campus Picuí", "loaKey": "PICUI", "demanda": "Dedetização", "valor": 15000.0, "doc": "OFÍCIO 72/2026 - DG/PC/REITORIA/IFPB", "just": "Não há justificativa individual apresentada; o ofício lista as prioridades do Campus Picuí para 2026 na ação 20RL.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d113", "unidade": "Campus Princesa Isabel", "loaKey": "PRINCESA ISABEL", "demanda": "Contratação de 03 assistentes educacionais inclusivos", "valor": 159010.53, "doc": "OFÍCIO 62/2026 - DG/PI/REITORIA/IFPB", "just": "Demanda urgente e mandatória para atendimento de estudantes PcD no exercício de 2026, devido ao aumento inesperado e atípico de matrículas, garantindo acessibilidade pedagógica e permanência.", "prioridade": "Prioridade 1", "rank": 1, "categoria": "CLAI/acessibilidade", "obs": "", "consolidada": false}, {"id": "d114", "unidade": "Campus Princesa Isabel", "loaKey": "PRINCESA ISABEL", "demanda": "Ajuda de custo para 30 estudantes atletas participarem dos JIFS", "valor": 15300.0, "doc": "OFÍCIO 62/2026 - DG/PI/REITORIA/IFPB", "just": "Ajuda de custo unitária de R$ 510,00 para deslocamento, alimentação e representação institucional; ação fundamental para incentivo às práticas desportivas e integração dos discentes.", "prioridade": "Prioridade 2", "rank": 2, "categoria": "Assistência/apoio estudantil", "obs": "", "consolidada": false}, {"id": "d165", "unidade": "Campus Avançado Soledade", "loaKey": "AVANÇADO SOLEDADE", "demanda": "Contratos", "valor": 61879.95, "doc": "OFÍCIO 66/2026 - DCSOL/REITORIA/IFPB", "just": "Campus recebeu menos recursos que em 2025 e informa risco de saldo negativo a partir de setembro/2026, atraso a fornecedores, quebra contratual e eventual reconhecimento de dívida se não houver complementação.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d166", "unidade": "Campus Avançado Soledade", "loaKey": "AVANÇADO SOLEDADE", "demanda": "Diárias e passagens", "valor": 8000.0, "doc": "OFÍCIO 66/2026 - DCSOL/REITORIA/IFPB", "just": "Campus recebeu menos recursos que em 2025 e informa risco de saldo negativo a partir de setembro/2026, atraso a fornecedores, quebra contratual e eventual reconhecimento de dívida se não houver complementação.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d167", "unidade": "Campus Avançado Soledade", "loaKey": "AVANÇADO SOLEDADE", "demanda": "Ações na extensão", "valor": 10000.0, "doc": "OFÍCIO 66/2026 - DCSOL/REITORIA/IFPB", "just": "Campus recebeu menos recursos que em 2025 e informa risco de saldo negativo a partir de setembro/2026, atraso a fornecedores, quebra contratual e eventual reconhecimento de dívida se não houver complementação.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d168", "unidade": "Campus Avançado Soledade", "loaKey": "AVANÇADO SOLEDADE", "demanda": "Suprimento de fundos", "valor": 5000.0, "doc": "OFÍCIO 66/2026 - DCSOL/REITORIA/IFPB", "just": "Campus recebeu menos recursos que em 2025 e informa risco de saldo negativo a partir de setembro/2026, atraso a fornecedores, quebra contratual e eventual reconhecimento de dívida se não houver complementação.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}, {"id": "d169", "unidade": "Campus Avançado Soledade", "loaKey": "AVANÇADO SOLEDADE", "demanda": "Materiais de consumo", "valor": 10000.0, "doc": "OFÍCIO 66/2026 - DCSOL/REITORIA/IFPB", "just": "Campus recebeu menos recursos que em 2025 e informa risco de saldo negativo a partir de setembro/2026, atraso a fornecedores, quebra contratual e eventual reconhecimento de dívida se não houver complementação.", "prioridade": "Não informado", "rank": 99, "categoria": "Custeio", "obs": "", "consolidada": false}]};
+</script>
+<script>
+'use strict';
+/* ===================== Estado ===================== */
+const STORE_KEY = 'painel_demandas_custeio_2026';
+const fmt = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
+const fmtN = v => v == null ? '—' : fmt.format(v);
+const fmtC = v => fmt.format(v).replace('R$', '').trim();
+const LOA_BY_KEY = {};
+DATA.loa.forEach(u => LOA_BY_KEY[u.key] = u);
+
+let state = { rt: 3100000, decisions: {}, openRow: null, tab: 'orc' };
+// decisions[id] = { status: 'deferido' | 'indeferido', valor: number, nota: string }
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){
+      const s = JSON.parse(raw);
+      if(s && typeof s === 'object'){
+        state.rt = typeof s.rt === 'number' ? s.rt : 3100000;
+        state.decisions = s.decisions || {};
+      }
+    }
+  }catch(e){ /* armazenamento indisponível: sessão em memória */ }
+}
+let storageOk = true;
+function saveState(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify({rt: state.rt, decisions: state.decisions, savedAt: new Date().toISOString()}));
+    storageOk = true;
+  }catch(e){ storageOk = false; }
+  const el = document.getElementById('save-state');
+  el.textContent = storageOk
+    ? 'Salvo neste navegador · ' + new Date().toLocaleTimeString('pt-BR')
+    : 'Armazenamento indisponível — use "Exportar decisões" para não perder o trabalho';
+  el.style.color = storageOk ? '' : 'var(--red)';
+}
+
+/* ===================== Abas ===================== */
+function setTab(t){
+  state.tab = t;
+  ['orc','dem','obs'].forEach(k => {
+    document.getElementById('tab-' + k).classList.toggle('active', t === k);
+    document.getElementById('tab-btn-' + k).classList.toggle('active', t === k);
+  });
+}
+
+/* ===================== Cálculos ===================== */
+function decisionOf(id){ return state.decisions[id] || null; }
+function statusOf(d){
+  const dec = decisionOf(d.id);
+  if(!dec) return 'pendente';
+  if(dec.status === 'indeferido') return 'indeferido';
+  if(d.valor != null && dec.valor < d.valor - 0.005) return 'parcial';
+  return 'deferido';
+}
+function deferredValue(d){
+  const dec = decisionOf(d.id);
+  return (dec && dec.status === 'deferido') ? (dec.valor || 0) : 0;
+}
+function totals(){
+  let total = 0, def = 0, nInt = 0, vInt = 0, nPar = 0, vPar = 0, nInd = 0, vInd = 0, nPend = 0, vPend = 0;
+  DATA.demandas.forEach(d => {
+    const v = d.valor || 0; total += v;
+    const st = statusOf(d);
+    if(st === 'deferido'){ nInt++; vInt += deferredValue(d); def += deferredValue(d); }
+    else if(st === 'parcial'){ nPar++; vPar += deferredValue(d); def += deferredValue(d); }
+    else if(st === 'indeferido'){ nInd++; vInd += v; }
+    else { nPend++; vPend += v; }
+  });
+  return {total, def, nInt, vInt, nPar, vPar, nInd, vInd, nPend, vPend, nDef: nInt + nPar, nAnal: nInt + nPar + nInd};
+}
+function demAggByLoaKey(){
+  const map = {};
+  DATA.demandas.forEach(d => {
+    const k = d.loaKey || '__sem__';
+    if(!map[k]) map[k] = {demandado:0, deferido:0, n:0};
+    map[k].demandado += d.valor || 0;
+    map[k].deferido += deferredValue(d);
+    map[k].n++;
+  });
+  return map;
+}
+
+/* ===================== Topo congelado + cards ===================== */
+function renderSummary(){
+  const t = totals();
+  // barra fixa
+  document.getElementById('sb-def').textContent = fmtN(t.def);
+  const saldo = state.rt - t.def;
+  const pct = state.rt > 0 ? t.def / state.rt * 100 : (t.def > 0 ? 100 : 0);
+  const sbSaldo = document.getElementById('sb-saldo');
+  sbSaldo.textContent = fmtN(saldo);
+  sbSaldo.className = 'value ' + (saldo < 0 ? 'red' : pct >= 85 ? 'amber' : 'green');
+  const fill = document.getElementById('rt-fill');
+  fill.style.width = Math.min(pct, 100).toFixed(1) + '%';
+  fill.style.background = saldo < 0 ? 'var(--red)' : pct >= 85 ? 'var(--amber)' : 'var(--green)';
+  document.getElementById('sb-pct').textContent = saldo < 0
+    ? 'Reserva excedida em ' + fmtN(-saldo)
+    : pct.toLocaleString('pt-BR',{maximumFractionDigits:1}) + '% da reserva utilizada';
+  document.getElementById('sb-ndef').textContent = t.nDef + (t.nDef === 1 ? ' demanda deferida' : ' demandas deferidas');
+
+  // cards
+  document.getElementById('c-total').textContent = fmtN(t.total);
+  const nUnits = new Set(DATA.demandas.map(d => d.unidade)).size;
+  document.getElementById('c-total-sub').textContent = DATA.demandas.length + ' · ' + nUnits + ' unidades';
+  document.getElementById('c-anal').textContent = t.nAnal + ' / ' + DATA.demandas.length;
+  document.getElementById('c-anal-sub').textContent = t.nPend;
+  document.getElementById('c-int').textContent = fmtN(t.vInt);
+  document.getElementById('c-int-sub').textContent = t.nInt;
+  document.getElementById('c-par').textContent = fmtN(t.vPar);
+  document.getElementById('c-par-sub').textContent = t.nPar;
+  document.getElementById('c-ind').textContent = fmtN(t.vInd);
+  document.getElementById('c-ind-sub').textContent = t.nInd;
+}
+
+/* ===================== Tabela de unidades (todas) ===================== */
+function pctChip(pct){
+  if(pct == null) return '<span class="muted">—</span>';
+  const cls = pct < 25 ? 'pct-low' : pct < 60 ? 'pct-mid' : 'pct-high';
+  return '<span class="pct-chip ' + cls + '">' + pct.toLocaleString('pt-BR',{maximumFractionDigits:1}) + '%</span>';
+}
+function renderUnits(){
+  const agg = demAggByLoaKey();
+  const rows = DATA.loa.map(u => {
+    const a = agg[u.key] || {demandado:0, deferido:0, n:0};
+    return {u, ...a};
+  });
+  rows.sort((a,b) => b.demandado - a.demandado || a.u.nome.localeCompare(b.u.nome,'pt-BR'));
+
+  let html = '';
+  let sl=0, sp=0, so=0, sd=0, sdef=0;
+  rows.forEach(r => {
+    const orcBase = r.u.orcamento || 0;
+    const orc = orcBase + r.deferido;
+    const pct = orcBase > 0 && r.demandado > 0 ? r.demandado / orcBase * 100 : null;
+    const att = r.demandado > 0 ? r.deferido / r.demandado * 100 : null;
+    sl += r.u.loa || 0; sp += r.u.recompP2024 || 0; so += orc; sd += r.demandado; sdef += r.deferido;
+    const orcCell = r.deferido > 0
+      ? '<td class="num orc-updated"><strong>' + fmtN(orc) + '</strong><span class="orc-delta">+ ' + fmtN(r.deferido) + ' deferido</span></td>'
+      : '<td class="num">' + fmtN(orcBase) + '</td>';
+    html += '<tr><td><strong>' + esc(r.u.nome) + '</strong>' +
+      (r.n > 0 ? '<div class="dem-unit">' + r.n + ' demanda' + (r.n>1?'s':'') + '</div>' : '<div class="dem-unit muted">sem demandas</div>') + '</td>' +
+      orcCell +
+      '<td class="num">' + fmtN(r.u.loa) + '</td>' +
+      '<td class="num">' + (r.u.recompP2024 != null ? fmtN(r.u.recompP2024) : '<span class="muted">—</span>') + '</td>' +
+      '<td class="num">' + (r.demandado > 0 ? '<strong>' + fmtN(r.demandado) + '</strong>' : '<span class="muted">—</span>') + '</td>' +
+      '<td class="num">' + pctChip(pct) + '</td>' +
+      '<td class="num" style="color:var(--green); font-weight:600">' + (r.deferido > 0 ? fmtN(r.deferido) : '<span class="muted">—</span>') + '</td>' +
+      '<td class="num">' + (att != null && r.deferido > 0 ? att.toLocaleString('pt-BR',{maximumFractionDigits:1}) + '%' : '<span class="muted">—</span>') + '</td></tr>';
+  });
+  html += '<tr style="background:#F8FAFC; font-weight:700"><td>Total — ' + rows.length + ' unidades</td>' +
+    '<td class="num">' + fmtN(so) + '</td><td class="num">' + fmtN(sl) + '</td>' +
+    '<td class="num">' + fmtN(sp) + '</td><td class="num">' + fmtN(sd) + '</td><td class="num"></td>' +
+    '<td class="num" style="color:var(--green)">' + fmtN(sdef) + '</td>' +
+    '<td class="num">' + (sd > 0 ? (sdef/sd*100).toLocaleString('pt-BR',{maximumFractionDigits:1}) + '%' : '') + '</td></tr>';
+  document.getElementById('unit-tbody').innerHTML = html;
+}
+
+/* ===================== Demandas ===================== */
+const prioBadge = d => {
+  const cls = d.rank === 1 ? 'b-p1' : d.rank === 2 ? 'b-p2' : d.rank <= 7 ? 'b-p3' : 'b-pn';
+  return '<span class="badge ' + cls + '">' + esc(d.prioridade) + '</span>';
+};
+const statusBadge = st => ({
+  deferido:'<span class="badge b-def">Deferido</span>',
+  parcial:'<span class="badge b-par">Deferido parcial</span>',
+  indeferido:'<span class="badge b-ind">Indeferido</span>',
+  pendente:'<span class="badge b-pen">Pendente</span>'
+}[st]);
+
+function filteredDemandas(){
+  const fu = document.getElementById('f-unidade').value;
+  const fp = document.getElementById('f-prio').value;
+  const fc = document.getElementById('f-cat').value;
+  const fs = document.getElementById('f-status').value;
+  const q = document.getElementById('f-busca').value.trim().toLowerCase();
+  let list = DATA.demandas.filter(d => {
+    if(fu && d.unidade !== fu) return false;
+    if(fp){
+      const g = +fp;
+      if(g === 4){ if(!(d.rank >= 4 && d.rank <= 7)) return false; }
+      else if(d.rank !== g) return false;
+    }
+    if(fc && d.categoria !== fc) return false;
+    if(fs && statusOf(d) !== fs) return false;
+    if(q && !(d.demanda + ' ' + d.just + ' ' + d.doc + ' ' + d.obs + ' ' + d.unidade).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const sort = document.getElementById('f-sort').value;
+  if(sort === 'valor') list.sort((a,b) => (b.valor||0) - (a.valor||0));
+  else if(sort === 'prio') list.sort((a,b) => a.rank - b.rank || (b.valor||0) - (a.valor||0));
+  else list.sort((a,b) => a.unidade.localeCompare(b.unidade,'pt-BR') || a.demanda.localeCompare(b.demanda,'pt-BR'));
+  return list;
+}
+
+function render(){
+  renderSummary(); renderUnits();
+  const list = filteredDemandas();
+  const sumV = list.reduce((s,d) => s + (d.valor||0), 0);
+  document.getElementById('count-line').textContent =
+    list.length + ' de ' + DATA.demandas.length + ' demandas exibidas · valor pedido no recorte: ' + fmtN(sumV);
+  const tbody = document.getElementById('dem-tbody');
+  let html = '';
+  list.forEach(d => {
+    const st = statusOf(d);
+    const dec = decisionOf(d.id);
+    const L = d.loaKey ? LOA_BY_KEY[d.loaKey] : null;
+    const pct = (L && L.orcamento && d.valor != null) ? (d.valor / L.orcamento * 100) : null;
+    const rowCls = st === 'indeferido' ? 'is-ind' : (st === 'deferido' || st === 'parcial') ? 'is-def' : '';
+    html += '<tr class="dem-row ' + rowCls + '" onclick="toggleRow(\'' + d.id + '\')">' +
+      '<td><div class="dem-name">' + esc(d.demanda) + '</div><div class="dem-unit">' + esc(d.unidade) + ' · ' + esc(d.categoria) + (d.consolidada ? ' · <span class="badge b-p3">consolidada</span>' : '') + '</div></td>' +
+      '<td class="num">' + (d.valor != null ? fmtN(d.valor) : '<span class="badge b-pn">não informado</span>') + '</td>' +
+      '<td class="num hide-sm">' + (pct != null ? pct.toLocaleString('pt-BR',{maximumFractionDigits:1}) + '%' : '<span class="muted">—</span>') + '</td>' +
+      '<td>' + statusBadge(st) + '</td>' +
+      '<td class="num" style="font-weight:600; color:' + (st==='indeferido' ? 'var(--red)' : 'var(--green)') + '">' +
+        ((st === 'deferido' || st === 'parcial') ? fmtN(dec.valor) : st === 'indeferido' ? 'R$ 0,00' : '<span class="muted">—</span>') + '</td>' +
+      '<td>' + prioBadge(d) + '</td></tr>';
+    if(state.openRow === d.id) html += detailRow(d, st, dec);
+  });
+  tbody.innerHTML = html || '<tr><td colspan="6" class="muted" style="text-align:center; padding:24px">Nenhuma demanda corresponde aos filtros.</td></tr>';
+}
+
+function detailRow(d, st, dec){
+  const valDef = dec && dec.status === 'deferido' ? dec.valor : (d.valor || 0);
+  const nota = dec && dec.nota ? dec.nota : '';
+  const integralBtn = d.valor != null
+    ? '<button class="btn b-green ' + (st==='deferido' ? 'active':'') + '" onclick="defer(\'' + d.id + '\', true)">Deferir valor integral</button>' +
+      '<span style="font-size:12.5px; color:var(--gray)">ou valor parcial:</span>'
+    : '<span style="font-size:12.5px; color:var(--gray)">Demanda sem valor informado — defina o valor a deferir:</span>';
+  return '<tr class="detail-row"><td colspan="6"><div class="detail-grid">' +
+    '<div><span class="dt-label">Justificativa apresentada</span><div class="dt-text">' + esc(d.just || '—') + '</div></div>' +
+    '<div><span class="dt-label">Documento de origem</span><div class="dt-text">' + esc(d.doc || '—') + '</div></div>' +
+    (d.obs ? '<div><span class="dt-label">Observações da unidade</span><div class="dt-text">' + esc(d.obs) + '</div></div>' : '') +
+    '<div><span class="dt-label">Decisão</span>' +
+    '<div class="decision-bar" onclick="event.stopPropagation()">' +
+      integralBtn +
+      '<input class="val-input" id="vi-' + d.id + '" value="' + fmtC(valDef) + '" inputmode="decimal" aria-label="Valor a deferir">' +
+      '<button class="btn b-green ' + (st==='parcial' ? 'active':'') + '" onclick="defer(\'' + d.id + '\', false)">Deferir este valor</button>' +
+      '<button class="btn b-red ' + (st==='indeferido' ? 'active':'') + '" onclick="indefer(\'' + d.id + '\')">Indeferir</button>' +
+      (st !== 'pendente' ? '<button class="btn" onclick="clearOne(\'' + d.id + '\')">Voltar a pendente</button>' : '') +
+    '</div>' +
+    '<div class="decision-bar" onclick="event.stopPropagation()" style="margin-top:8px">' +
+      '<input class="nota-input" id="ni-' + d.id + '" placeholder="Nota da análise (opcional — sai no relatório PDF)" value="' + escAttr(nota) + '" onchange="setNota(\'' + d.id + '\', this.value)">' +
+    '</div></div></div></td></tr>';
+}
+
+function toggleRow(id){
+  state.openRow = state.openRow === id ? null : id;
+  render();
+}
+function parseBRNumber(s){
+  s = String(s).trim().replace(/[R$\s]/g,'');
+  if(!s) return NaN;
+  if(s.includes(',')) s = s.replace(/\./g,'').replace(',','.');
+  return parseFloat(s);
+}
+function defer(id, full){
+  const d = DATA.demandas.find(x => x.id === id);
+  let v;
+  if(full){ v = d.valor || 0; }
+  else{
+    v = parseBRNumber(document.getElementById('vi-' + id).value);
+    if(isNaN(v) || v < 0){ alert('Informe um valor válido para o deferimento.'); return; }
+    if(d.valor != null && v > d.valor){ alert('O valor deferido não pode ser maior que o valor pedido (' + fmtN(d.valor) + ').'); return; }
+  }
+  const ni = document.getElementById('ni-' + id);
+  const nota = ni ? ni.value : (state.decisions[id]?.nota || '');
+  state.decisions[id] = {status:'deferido', valor: v, nota};
+  saveState(); render();
+}
+function indefer(id){
+  const ni = document.getElementById('ni-' + id);
+  const nota = ni ? ni.value : (state.decisions[id]?.nota || '');
+  state.decisions[id] = {status:'indeferido', valor: 0, nota};
+  saveState(); render();
+}
+function clearOne(id){ delete state.decisions[id]; saveState(); render(); }
+function setNota(id, v){
+  if(state.decisions[id]){ state.decisions[id].nota = v; saveState(); }
+}
+function clearDecisions(){
+  if(!confirm('Limpar todas as decisões registradas? Esta ação não pode ser desfeita (exporte um .json antes, se necessário).')) return;
+  state.decisions = {}; state.openRow = null; saveState(); render();
+}
+
+/* ===================== Exportações ===================== */
+function exportJSON(){
+  const blob = new Blob([JSON.stringify({rt: state.rt, decisions: state.decisions, exportedAt: new Date().toISOString()}, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'decisoes_demandas_custeio_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function importJSON(input){
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const s = JSON.parse(reader.result);
+      if(!s || typeof s.decisions !== 'object') throw 0;
+      state.decisions = s.decisions;
+      if(typeof s.rt === 'number'){ state.rt = s.rt; document.getElementById('rt-input').value = fmtC(state.rt); }
+      saveState(); render();
+    }catch(e){ alert('Arquivo inválido. Selecione um .json exportado por este painel.'); }
+  };
+  reader.readAsText(file); input.value = '';
+}
+
+function exportPDF(){
+  const t = totals();
+  const agg = demAggByLoaKey();
+  const now = new Date();
+  const defs = DATA.demandas.filter(d => { const s = statusOf(d); return s === 'deferido' || s === 'parcial'; })
+    .sort((a,b) => a.unidade.localeCompare(b.unidade,'pt-BR') || a.rank - b.rank);
+  const inds = DATA.demandas.filter(d => statusOf(d) === 'indeferido')
+    .sort((a,b) => a.unidade.localeCompare(b.unidade,'pt-BR') || a.rank - b.rank);
+  const saldo = state.rt - t.def;
+
+  let html = '<p class="pr-title">Instituto Federal da Paraíba — Diretoria de Planejamento</p>' +
+    '<h1>Reserva Técnica — Análise das Demandas de Custeio</h1>' +
+    '<p class="pr-sub">Respostas ao Ofício Circular 11/2026 — PRAF/REITORIA/IFPB · demandas prioritárias de custeio (20RL) · Deliberação da 46ª Reunião Extraordinária do CODIR · Relatório gerado em ' +
+    now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) + '</p>' +
+    '<div class="pr-cards">' +
+    '<div class="pr-card"><div class="label">Total demandado</div><div class="value">' + fmtN(t.total) + '</div></div>' +
+    '<div class="pr-card"><div class="label">Total deferido</div><div class="value pos">' + fmtN(t.def) + '</div></div>' +
+    '<div class="pr-card"><div class="label">Reserva Técnica informada</div><div class="value">' + fmtN(state.rt) + '</div></div>' +
+    '<div class="pr-card"><div class="label">Saldo da Reserva</div><div class="value ' + (saldo < 0 ? 'neg' : 'pos') + '">' + fmtN(saldo) + '</div></div>' +
+    '</div>' +
+    '<p style="font-size:11px; color:#555">' + t.nInt + ' deferidas integralmente · ' + t.nPar + ' deferidas parcialmente · ' + t.nInd + ' indeferidas · ' + t.nPend + ' pendentes de análise (' + fmtN(t.vPend) + ')</p>';
+
+  html += '<h2>Resumo por unidade</h2><table><thead><tr><th>Unidade</th><th class="num">Orçamento (com deferido)</th><th class="num">LOA</th><th class="num">Demandado</th><th class="num">Deferido</th><th class="num">Atendimento</th></tr></thead><tbody>';
+  const rows = DATA.loa.map(u => ({u, ...(agg[u.key] || {demandado:0, deferido:0, n:0})}))
+    .sort((a,b) => b.demandado - a.demandado || a.u.nome.localeCompare(b.u.nome,'pt-BR'));
+  rows.forEach(r => {
+    const orc = (r.u.orcamento||0) + r.deferido;
+    html += '<tr><td>' + esc(r.u.nome) + '</td><td class="num">' + fmtN(orc) + (r.deferido > 0 ? ' <strong class="pos">(+' + fmtN(r.deferido) + ')</strong>' : '') +
+      '</td><td class="num">' + fmtN(r.u.loa) +
+      '</td><td class="num">' + (r.demandado > 0 ? fmtN(r.demandado) : '—') +
+      '</td><td class="num">' + (r.deferido > 0 ? fmtN(r.deferido) : '—') +
+      '</td><td class="num">' + (r.demandado > 0 && r.deferido > 0 ? (r.deferido/r.demandado*100).toLocaleString('pt-BR',{maximumFractionDigits:1}) + '%' : '—') + '</td></tr>';
+  });
+  html += '</tbody></table>';
+
+  html += '<h2>Demandas deferidas (' + defs.length + ')</h2>';
+  if(defs.length){
+    html += '<table><thead><tr><th>Unidade</th><th>Demanda</th><th>Prioridade</th><th class="num">Pedido</th><th class="num">Deferido</th><th>Nota</th></tr></thead><tbody>';
+    defs.forEach(d => {
+      const dec = decisionOf(d.id);
+      const parcial = statusOf(d) === 'parcial';
+      html += '<tr><td>' + esc(d.unidade) + '</td><td>' + esc(d.demanda) + (parcial ? ' <em>(parcial)</em>' : '') + '</td><td>' + esc(d.prioridade) +
+        '</td><td class="num">' + fmtN(d.valor) + '</td><td class="num"><strong>' + fmtN(dec.valor) + '</strong></td><td>' + esc(dec.nota || '') + '</td></tr>';
+    });
+    html += '</tbody></table>';
+  } else { html += '<p style="font-size:11px; color:#777">Nenhuma demanda deferida até o momento.</p>'; }
+
+  if(inds.length){
+    html += '<h2>Demandas indeferidas (' + inds.length + ')</h2><table><thead><tr><th>Unidade</th><th>Demanda</th><th>Prioridade</th><th class="num">Valor pedido</th><th>Nota</th></tr></thead><tbody>';
+    inds.forEach(d => {
+      const dec = decisionOf(d.id);
+      html += '<tr><td>' + esc(d.unidade) + '</td><td>' + esc(d.demanda) + '</td><td>' + esc(d.prioridade) + '</td><td class="num">' + fmtN(d.valor) + '</td><td>' + esc(dec.nota || '') + '</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+  html += '<p class="pr-foot">Painel Reserva Técnica — Análise das Demandas de Custeio · valores em reais (R$) · prioridades conforme informado pelas unidades demandantes. Para salvar em PDF, escolha "Salvar como PDF" na janela de impressão.</p>';
+
+  document.getElementById('print-report').innerHTML = html;
+  window.print();
+}
+
+/* ===================== Utilitários ===================== */
+function esc(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s){ return esc(s).replace(/"/g,'&quot;'); }
+
+/* ===================== Inicialização ===================== */
+function init(){
+  loadState();
+  const rt = document.getElementById('rt-input');
+  rt.value = fmtC(state.rt);
+  rt.addEventListener('change', () => {
+    const v = parseBRNumber(rt.value);
+    if(!isNaN(v) && v >= 0){ state.rt = v; }
+    rt.value = fmtC(state.rt);
+    saveState(); renderSummary();
+  });
+
+  const fu = document.getElementById('f-unidade');
+  const units = [...new Set(DATA.demandas.map(d => d.unidade))].sort((a,b) => a.localeCompare(b,'pt-BR'));
+  fu.innerHTML = '<option value="">Todas as unidades</option>' + units.map(u => '<option>' + esc(u) + '</option>').join('');
+
+  const fc = document.getElementById('f-cat');
+  const cats = [...new Set(DATA.demandas.map(d => d.categoria))].sort((a,b) => a.localeCompare(b,'pt-BR'));
+  fc.innerHTML = '<option value="">Todas as categorias</option>' + cats.map(c => '<option>' + esc(c) + '</option>').join('');
+
+  saveState();
+  render();
+}
+init();
+
+</script>
+</body>
+</html>
