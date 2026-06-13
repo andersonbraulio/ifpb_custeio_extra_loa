@@ -627,10 +627,8 @@ function exportPDF(){
     .sort((a,b) => a.unidade.localeCompare(b.unidade,'pt-BR') || a.rank - b.rank);
   const saldo = state.rt - t.def;
 
-  let html = '<p class="pr-title">Instituto Federal da Paraíba — Diretoria de Planejamento</p>' +
-    '<h1>Reserva Técnica — Análise das Demandas de Custeio</h1>' +
-    '<p class="pr-sub">Respostas ao Ofício Circular 11/2026 — PRAF/REITORIA/IFPB · demandas prioritárias de custeio (20RL) · Deliberação da 46ª Reunião Extraordinária do CODIR · Relatório gerado em ' +
-    now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) + '</p>' +
+  let html = 
+    '<h1>Demandas de Custeio Extra LOA - 2026</h1>' +
     '<div class="pr-cards">' +
     '<div class="pr-card"><div class="label">Total demandado</div><div class="value">' + fmtN(t.total) + '</div></div>' +
     '<div class="pr-card"><div class="label">Total deferido</div><div class="value pos">' + fmtN(t.def) + '</div></div>' +
